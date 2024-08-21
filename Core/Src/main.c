@@ -21,7 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "lvgl/lvgl.h"
+#include "lvgl_port_touch.h"
+#include "lvgl_port_display.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,16 +47,13 @@ I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
 
-UART_HandleTypeDef huart2;
-
 /* USER CODE BEGIN PV */
-
+static lv_obj_t *meter;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
@@ -64,6 +63,100 @@ static void MX_SPI1_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/*
+ * ui_btn_event_cb()
+ */
+static void
+ui_btn_event_cb (lv_event_t *event)
+{
+  lv_obj_t *btn;
+  lv_event_code_t code;
+
+  btn = lv_event_get_target(event);
+  code = lv_event_get_code(event);
+
+  if (code == LV_EVENT_CLICKED)
+    {
+       static uint8_t cnt = 0;
+       cnt++;
+
+       lv_obj_t *label = lv_obj_get_child(btn, 0);
+       lv_label_set_text_fmt(label, "Clicked: %d", cnt);
+    }
+}
+
+/*
+ * ui_set_indic_value()
+ */
+static void
+ui_set_indic_value (void     *indic,
+                    int32_t   value)
+{
+  lv_meter_set_indicator_end_value (meter, indic, value);
+}
+
+/*
+ * ui_example_meter()
+ */
+static void
+ui_example_meter (void)
+{
+  meter = lv_meter_create(lv_scr_act());
+  lv_obj_align(meter, LV_ALIGN_TOP_MID, 0, 5);
+  lv_obj_set_size(meter, 180, 180);
+
+  /* remove the circle from the middle */
+  lv_obj_remove_style(meter, NULL, LV_PART_INDICATOR);
+
+  /* add a scale first */
+  lv_meter_scale_t *scale = lv_meter_add_scale(meter);
+  lv_meter_set_scale_ticks(meter, scale, 11, 2, 10, lv_palette_main(LV_PALETTE_GREY));
+  lv_meter_set_scale_major_ticks(meter, scale, 2, 2, 30, lv_color_hex3(0xddd), 10);
+  lv_meter_set_scale_range(meter, scale, 0, 100, 270, 90);
+
+  /* add a three arc indicator */
+  lv_meter_indicator_t *indic1 = lv_meter_add_arc(meter, scale, 10, lv_color_hex(0xFF6229), 0);
+  lv_meter_indicator_t *indic2 = lv_meter_add_arc(meter, scale, 10, lv_color_hex(0x002175), -10);
+  lv_meter_indicator_t *indic3 = lv_meter_add_arc(meter, scale, 10, lv_palette_main(LV_PALETTE_GREEN), -20);
+
+  /* create an animation to set the value */
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_exec_cb(&a, ui_set_indic_value);
+  lv_anim_set_values(&a, 0, 100);
+  lv_anim_set_repeat_delay(&a, 100);
+  lv_anim_set_playback_delay(&a, 100);
+  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+
+  /* start animation - indicator 1 */
+  lv_anim_set_time(&a, 2000);
+  lv_anim_set_playback_time(&a, 1000);
+  lv_anim_set_var(&a, indic1);
+  lv_anim_start(&a);
+
+  /* start animation - indicator 2 */
+  lv_anim_set_time(&a, 1000);
+  lv_anim_set_playback_time(&a, 2000);
+  lv_anim_set_var(&a, indic2);
+  lv_anim_start(&a);
+
+  /* start animation - indicator 3 */
+  lv_anim_set_time(&a, 1000);
+  lv_anim_set_playback_time(&a, 5000);
+  lv_anim_set_var(&a, indic3);
+  lv_anim_start(&a);
+
+  /* add button */
+  lv_obj_t *btn = lv_btn_create(lv_scr_act());
+  lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, -15);
+  lv_obj_set_size(btn, 120, 30);
+  lv_obj_add_event_cb(btn, ui_btn_event_cb, LV_EVENT_ALL, NULL);
+
+  /* add a label to the button */
+  lv_obj_t *label = lv_label_create(btn);
+  lv_label_set_text(label, "Start");
+  lv_obj_center(label);
+}
 /* USER CODE END 0 */
 
 /**
@@ -95,10 +188,19 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
   MX_I2C1_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
+
+  /* initialize LVGL framework */
+  lv_init();
+
+  /* initialize display and touch */
+  lvgl_display_init();
+  lvgl_touchscreen_init();
+
+  /* LVGL demo */
+  ui_example_meter();
 
   /* USER CODE END 2 */
 
@@ -109,6 +211,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    HAL_Delay(5);
+    lv_task_handler();
   }
   /* USER CODE END 3 */
 }
@@ -220,7 +324,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -233,55 +337,13 @@ static void MX_SPI1_Init(void)
   }
   /* USER CODE BEGIN SPI1_Init 2 */
 
+  /* reconfigure SPI to 9-bit */
+  hspi1.Init.DataSize = SPI_DATASIZE_9BIT;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART2_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART2_Init 0 */
-
-  /* USER CODE END USART2_Init 0 */
-
-  /* USER CODE BEGIN USART2_Init 1 */
-
-  /* USER CODE END USART2_Init 1 */
-  huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
-  huart2.Init.WordLength = UART_WORDLENGTH_8B;
-  huart2.Init.StopBits = UART_STOPBITS_1;
-  huart2.Init.Parity = UART_PARITY_NONE;
-  huart2.Init.Mode = UART_MODE_TX_RX;
-  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART2_Init 2 */
-
-  /* USER CODE END USART2_Init 2 */
 
 }
 
@@ -332,6 +394,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(CTP_INT_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_15_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

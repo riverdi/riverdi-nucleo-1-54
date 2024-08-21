@@ -67,6 +67,7 @@ void Error_Handler(void);
 #define LCD_CS_GPIO_Port GPIOA
 #define CTP_INT_Pin GPIO_PIN_10
 #define CTP_INT_GPIO_Port GPIOA
+#define CTP_INT_EXTI_IRQn EXTI4_15_IRQn
 #define BACKLIGHT_Pin GPIO_PIN_8
 #define BACKLIGHT_GPIO_Port GPIOC
 
