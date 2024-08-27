@@ -154,7 +154,7 @@ ui_example_meter (void)
 
   /* add a label to the button */
   lv_obj_t *label = lv_label_create(btn);
-  lv_label_set_text(label, "Start");
+  lv_label_set_text(label, "Click!");
   lv_obj_center(label);
 }
 /* USER CODE END 0 */
