@@ -22,14 +22,12 @@ static __attribute__((aligned(32))) lv_color_t buf[240*16];
  * disp_spi_write()
  */
 static void
-disp_spi_write (uint16_t data)
+disp_spi_write (uint8_t data)
 {
-  while((SPI1->SR & SPI_SR_BSY) == SPI_SR_BSY);
-
   HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_RESET);
-  SPI1->DR = data;
 
-  while((SPI1->SR & SPI_SR_BSY) == SPI_SR_BSY);
+  HAL_SPI_Transmit(&hspi1, &data, 1, 1000);
+
   HAL_GPIO_WritePin(LCD_CS_GPIO_Port, LCD_CS_Pin, GPIO_PIN_SET);
 }
 
@@ -39,8 +37,9 @@ disp_spi_write (uint16_t data)
 static void
 disp_spi_write_cmd (uint8_t cmd)
 {
-  uint16_t val = (uint16_t)cmd;
-  disp_spi_write(val);
+  HAL_GPIO_WritePin(LCD_WRX_GPIO_Port, LCD_WRX_Pin, GPIO_PIN_RESET);
+
+  disp_spi_write(cmd);
 }
 
 /*
@@ -49,8 +48,9 @@ disp_spi_write_cmd (uint8_t cmd)
 static void
 disp_spi_write_data (uint8_t data)
 {
-  uint16_t val = (uint16_t)(data | 0x0100);
-  disp_spi_write(val);
+  HAL_GPIO_WritePin(LCD_WRX_GPIO_Port, LCD_WRX_Pin, GPIO_PIN_SET);
+
+  disp_spi_write(data);
 }
 
 /*
@@ -114,6 +114,7 @@ disp_flush (lv_disp_drv_t    *drv,
     }
 
   lv_disp_flush_ready (&disp_drv);
+
 }
 
 /**********************
@@ -123,14 +124,12 @@ disp_flush (lv_disp_drv_t    *drv,
 void
 lvgl_display_init (void)
 {
-  __HAL_SPI_ENABLE(&hspi1);
-
   /* reset display */
-  HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_SET);
   HAL_Delay(100);
-  HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_RESET);
   HAL_Delay(100);
-  HAL_GPIO_WritePin(LCD_RESET_GPIO_Port, LCD_RESET_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LCD_RST_GPIO_Port, LCD_RST_Pin, GPIO_PIN_SET);
   HAL_Delay(100);
 
   /* display settings */
